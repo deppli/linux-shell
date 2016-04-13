@@ -205,8 +205,9 @@ echo '<sqlMap namespace="'${beanName}'">' >> $xmlFileName
 echo "" >> $xmlFileName
 echo '<typeAlias alias="'$smallBeanName'" type="'$beanName'"/>' >> $xmlFileName
 echo "" >> $xmlFileName
-echo '<sql id="allFields">' >> $xmlFileName
 
+#allFields
+echo '<sql id="allFields">' >> $xmlFileName
 for (( i = 0; i < $arrayLength; i++ )); do
 	if [[ $i == $(expr $arrayLength - 1) ]]; then
 		echo " "${bigFieldAarray[i]} >> $xmlFileName
@@ -214,9 +215,18 @@ for (( i = 0; i < $arrayLength; i++ )); do
 		echo " "${bigFieldAarray[i]}"," >> $xmlFileName
 	fi
 done
-
 echo "</sql>" >> $xmlFileName
 echo "" >> $xmlFileName
+
+#resultMap
+echo '<resultMap id="'$smallBeanName'Map" class="'$smallBeanName'">' >> $xmlFileName
+for (( i = 0; i < $arrayLength; i++ )); do
+	echo '	<result property="'${smallFieldArray[i]}'" column="'${bigFieldAarray[i]}'"/>' >> $xmlFileName
+done
+echo '</resultMap>' >> $xmlFileName
+
+echo "" >> $xmlFileName
+
 echo "</sqlMap>" >> $xmlFileName
 
 echo "****** end ******"
