@@ -18,6 +18,7 @@ tableName=$(cat $fileName| grep -i 'create table'| grep -o -E '\w*_\w*')
 specialIndex=$(expr $(echo $tableName|awk -F "_" '{print  length($1)}') + 1)
 lastLength=$(expr ${#tableName} - $specialIndex)
 beanName=${tableName:$specialIndex:$lastLength}
+smallBeanName=$(echo ${beanName:0:1}|tr '[A-Z]' '[a-z]')${beanName:1:$(expr ${#beanName} - 1)}
 
 fieldStartLine=$(expr $(cat $fileName| grep -n -i 'create table'|awk -F ':' '{print $1}') + 1)
 fieldEndLine=$(expr $(cat $fileName| grep -n -i 'primary key'|awk -F ':' '{print $1}') - 1)
@@ -188,6 +189,13 @@ echo "import com.dianping.avatar.dao.annotation.DAOParam;" >> $daoFileName
 echo "" >> $daoFileName
 
 echo "public interface "$daoBeanName 'extends GenericDao{ ' >> $daoFileName
+echo "" >> $daoFileName
+echo "	@DAOAction(action = DAOActionType.INSERT)" >> $daoFileName
+echo '	public int add'$beanName'(@DAOParam("'$smallBeanName'") '$beanName $smallBeanName');' >> $daoFileName
+echo "" >> $daoFileName
+echo "	@DAOAction(action = DAOActionType.UPDATE)" >> $daoFileName
+echo '	public int update'$beanName'(@DAOParam("'$smallBeanName'") '$beanName $smallBeanName');' >> $daoFileName
+echo "" >> $daoFileName
 echo "}" >> $daoFileName
 
 
@@ -198,7 +206,6 @@ if [[ -f $xmlFileName ]]; then
 	rm -rf $xmlFileName
 fi
 
-smallBeanName=$(echo ${beanName:0:1}|tr '[A-Z]' '[a-z]')${beanName:1:$(expr ${#beanName} - 1)}
 echo '<?xml version="1.0" encoding="UTF-8"?>' >> $xmlFileName
 echo '<!DOCTYPE sqlMap PUBLIC "-//ibatis.apache.org//DTD SQL Map 2.0//EN" "http://ibatis.apache.org/dtd/sql-map-2.dtd">' >> $xmlFileName
 echo '<sqlMap namespace="'${beanName}'">' >> $xmlFileName
@@ -226,6 +233,89 @@ done
 echo '</resultMap>' >> $xmlFileName
 
 echo "" >> $xmlFileName
+
+#insert
+echo '<insert id="add'$beanName'" parameterClass="map">' >> $xmlFileName
+echo '	<![CDATA[' >> $xmlFileName
+echo '	INSERT INTO '$tableName >> $xmlFileName
+echo '	(' >> $xmlFileName
+for (( i = 0; i < arrayLength; i++ )); do
+	if [[ $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') != 'id' ]]; then
+		if [[ $i == $(expr $arrayLength - 1) ]]; then
+			echo " 	"${bigFieldAarray[i]} >> $xmlFileName
+		else
+			echo " 	"${bigFieldAarray[i]}"," >> $xmlFileName
+		fi	
+	fi
+done
+echo " 	)" >> $xmlFileName
+echo "	VALUES" >> $xmlFileName
+echo "	(" >> $xmlFileName
+for (( i = 0; i < arrayLength; i++ )); do
+	if [[ $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') != 'id' ]]; then
+		if [[ $i == $(expr $arrayLength - 1) ]]; then
+			if [[ $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') == 'addtime' || $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') == 'updatetime' ]]; then
+				echo "	NOW()" >> $xmlFileName
+			else
+				echo '	#'$smallBeanName'.'${smallFieldArray[i]}'#' >> $xmlFileName
+			fi
+		else
+			if [[ $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') == 'addtime' || $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') == 'updatetime' ]]; then
+				echo "	NOW()," >> $xmlFileName
+			else
+				echo '	#'$smallBeanName'.'${smallFieldArray[i]}'#,' >> $xmlFileName
+			fi
+		fi	
+	fi
+done
+echo ")" >> $xmlFileName
+echo "]]>" >> $xmlFileName
+echo '<selectKey resultClass="int" keyProperty="id">' >> $xmlFileName
+echo ' SELECT @@IDENTITY' >> $xmlFileName
+echo '  AS Id' >> $xmlFileName
+echo '</selectKey>' >> $xmlFileName
+echo '</insert>' >> $xmlFileName
+echo '' >> $xmlFileName
+
+#update
+echo '<update id="update'$beanName'" parameterClass="map">' >> $xmlFileName
+echo '  <![CDATA[' >> $xmlFileName
+echo '  UPDATE '$tableName >> $xmlFileName
+echo '  SET' >> $xmlFileName
+for (( i = 0; i < arrayLength; i++ )); do
+	if [[ $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') != 'id' && $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') != 'addtime' ]]; then
+		if [[ $i == $(expr $arrayLength - 1) ]]; then
+			if [[  $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') == 'updatetime' ]]; then
+				echo "	 UpdateTime=NOW()" >> $xmlFileName
+			else
+				echo '  '${bigFieldAarray[i]}'=#'$smallBeanName'.'${smallFieldArray[i]}'#' >> $xmlFileName
+			fi
+		else
+			if [[  $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') == 'updatetime' ]]; then
+				echo "  UpdateTime=NOW()," >> $xmlFileName
+			else
+				echo '  '${bigFieldAarray[i]}'=#'$smallBeanName'.'${smallFieldArray[i]}'#,' >> $xmlFileName
+			fi
+		fi	
+	fi
+done
+
+for (( i = 0; i < arrayLength; i++ )); do
+	if [[ $(echo ${bigFieldAarray[i]}|tr '[A-Z]' '[a-z]') == 'id' ]]; then
+		idBigField=${bigFieldAarray[i]}
+	fi
+
+	if [[ $(echo ${smallFieldArray[i]}|tr '[A-Z]' '[a-z]') == 'id' ]]; then
+		idSmallField=${smallFieldArray[i]}
+	fi
+done
+
+
+echo '  WHERE' >> $xmlFileName
+echo '  '$idBigField'=#'$smallBeanName'.'$idSmallField'#' >> $xmlFileName
+echo '  ]]>' >> $xmlFileName
+echo '</update>' >> $xmlFileName
+echo '' >> $xmlFileName
 
 echo "</sqlMap>" >> $xmlFileName
 
